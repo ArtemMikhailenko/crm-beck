@@ -1,11 +1,12 @@
 import {
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
   UnauthorizedException
 } from '@nestjs/common'
-import { forwardRef, Inject } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { AuthMethod, User } from '@prisma/__generated__'
 import { verify } from 'argon2'
@@ -15,7 +16,6 @@ import { LoginDto } from '@/auth/dto/login.dto'
 import { RegisterDto } from '@/auth/dto/register.dto'
 import { EmailConfirmationService } from '@/auth/email-confirmation/email-confirmation.service'
 import { ProviderService } from '@/auth/provider/provider.service'
-import { MailService } from '@/libs/mail/mail.service'
 import { PrismaService } from '@/prisma/prisma.service'
 import { UserService } from '@/user/user.service'
 
@@ -33,7 +33,7 @@ export class AuthService {
     private readonly twoFactorService: TwoFactorService
   ) {}
 
-  public async register(req: Request, dto: RegisterDto) {
+  public async register(dto: RegisterDto) {
     const isExists = await this.userService.findByEmail(dto.email)
 
     if (isExists) {

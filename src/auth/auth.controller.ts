@@ -32,8 +32,8 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  public async register(@Req() req: Request, @Body() dto: RegisterDto) {
-    return this.authService.register(req, dto)
+  public async register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto)
   }
 
   @Get('/oauth/callback/:provider')
@@ -53,7 +53,7 @@ export class AuthController {
     await this.authService.extractProfileFromCode(req, provider, code)
 
     return res.redirect(
-      `${this.configService.getOrThrow<string>('ALLOWED_ORIGIN')}/`
+      `${this.configService.getOrThrow<string>('ALLOWED_ORIGIN')}/dashboard/settings`
     )
   }
 

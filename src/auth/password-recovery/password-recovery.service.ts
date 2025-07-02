@@ -1,16 +1,11 @@
 import {
   BadRequestException,
-  ConflictException,
-  forwardRef,
-  Inject,
   Injectable,
   NotFoundException
 } from '@nestjs/common'
 import { AuthMethod, TokenType } from '@prisma/__generated__'
 import { hash } from 'argon2'
-import { Request } from 'express'
 
-import { AuthService } from '@/auth/auth.service'
 import { RecoveryPasswordDto } from '@/auth/password-recovery/dto/recovery-password.dto'
 import { RecoveryDto } from '@/auth/password-recovery/dto/recovery.dto'
 import { generateSixDigitNumberInRange } from '@/libs/common/utils/generate-random.util'
@@ -27,6 +22,8 @@ export class PasswordRecoveryService {
   ) {}
 
   public async sendRecovery(dto: RecoveryDto) {
+    console.log(dto)
+
     const user = await this.userService.findByEmail(dto.email)
 
     if (!user) {
@@ -52,7 +49,7 @@ export class PasswordRecoveryService {
       })
     }
 
-    const verificationToken = await this.db.token.create({
+    await this.db.token.create({
       data: {
         email: user.email,
         type: TokenType.PASSWORD_RESET,
@@ -61,7 +58,7 @@ export class PasswordRecoveryService {
       }
     })
 
-    this.mailService.sendRecoveryEmail(user.email, token)
+    await this.mailService.sendRecoveryEmail(user.email, token)
 
     return true
   }

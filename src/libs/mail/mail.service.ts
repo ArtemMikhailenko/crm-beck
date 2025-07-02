@@ -4,9 +4,9 @@ import { ConfigService } from '@nestjs/config'
 import { render } from '@react-email/components'
 
 import { RecoveryTemplate } from '@/libs/mail/templates/recovery.template'
+import { TwoFactorTemplate } from '@/libs/mail/templates/two-factor.template'
 
 import { ConfirmationTemplate } from './templates/confirmation.template'
-import { TwoFactorTemplate } from '@/libs/mail/templates/two-factor.template'
 
 @Injectable()
 export class MailService {
@@ -34,8 +34,11 @@ export class MailService {
   }
 
   private sendEmail(to: string, subject: string, html: string) {
+    const from = this.configService.getOrThrow<string>('MAIL_FROM')
+
     return this.mailerService.sendMail({
       to,
+      from,
       subject,
       html
     })

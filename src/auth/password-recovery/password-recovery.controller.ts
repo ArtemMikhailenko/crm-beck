@@ -4,15 +4,12 @@ import {
   HttpCode,
   HttpStatus,
   Param,
-  Post,
-  Req
+  Post
 } from '@nestjs/common'
-import { Request } from 'express'
 
 import { RecoveryPasswordDto } from '@/auth/password-recovery/dto/recovery-password.dto'
 import { RecoveryDto } from '@/auth/password-recovery/dto/recovery.dto'
-
-import { PasswordRecoveryService } from './password-recovery.service'
+import { PasswordRecoveryService } from '@/auth/password-recovery/password-recovery.service'
 
 @Controller('auth/recovery')
 export class PasswordRecoveryController {
