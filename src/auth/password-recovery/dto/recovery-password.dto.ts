@@ -1,6 +1,13 @@
-import { IsEmail, IsNotEmpty, IsString, MaxLength, MinLength, Validate } from 'class-validator'
-import { IsPasswordStrong } from '@/libs/common/decorators/is-password-strong.decorator'
+import {
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+  MinLength,
+  Validate
+} from 'class-validator'
+
 import { IsPasswordsMatchingConstraint } from '@/libs/common/decorators/is-password-marching.decorator'
+import { IsPasswordStrong } from '@/libs/common/decorators/is-password-strong.decorator'
 
 export class RecoveryPasswordDto {
   @IsString({ message: 'Password must be a string' })

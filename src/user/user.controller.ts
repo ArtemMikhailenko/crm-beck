@@ -11,6 +11,7 @@ import { UserRole } from '@prisma/__generated__'
 
 import { Authorization } from '@/auth/decorators/auth.decorator'
 import { Authorized } from '@/auth/decorators/authorizated.decorator'
+import { ChangePasswordDto } from '@/user/dto/change-password.dto'
 import { UserDto } from '@/user/dto/user.dto'
 import { UserService } from '@/user/user.service'
 
@@ -47,5 +48,15 @@ export class UserController {
     @Body() dto: UserDto
   ) {
     return this.userService.updateProfile(id, dto)
+  }
+
+  @Put('password')
+  @HttpCode(HttpStatus.OK)
+  @Authorization()
+  public async changePassword(
+    @Authorized('id') id: string,
+    @Body() dto: ChangePasswordDto
+  ) {
+    return this.userService.changePassword(id, dto)
   }
 }

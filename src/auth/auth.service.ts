@@ -73,6 +73,8 @@ export class AuthService {
     }
 
     if (!user.isVerified) {
+      await this.emailConfirmationService.sendVerificationToken(user)
+
       throw new UnauthorizedException(
         'Email is not verified. Please confirm your email.'
       )

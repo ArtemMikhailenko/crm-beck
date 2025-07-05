@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common'
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException
+} from '@nestjs/common'
 import { AuthMethod } from '@prisma/__generated__'
-import { hash } from 'argon2'
+import { hash, verify } from 'argon2'
 
 import { PrismaService } from '@/prisma/prisma.service'
+import { ChangePasswordDto } from '@/user/dto/change-password.dto'
 import { UserDto } from '@/user/dto/user.dto'
 
 @Injectable()
@@ -77,5 +82,31 @@ export class UserService {
     })
 
     return updatedUser
+  }
+
+  public async changePassword(id: string, dto: ChangePasswordDto) {
+    const user = await this.findById(id)
+
+    if (!user.password) {
+      throw new UnauthorizedException('User has no password set')
+    }
+
+    const isCurrentPasswordValid = await verify(
+      user.password,
+      dto.currentPassword
+    )
+
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('Current password is incorrect')
+    }
+
+    const hashedNewPassword = await hash(dto.newPassword)
+
+    await this.db.user.update({
+      where: { id: user.id },
+      data: { password: hashedNewPassword }
+    })
+
+    return { message: 'Password updated successfully' }
   }
 }

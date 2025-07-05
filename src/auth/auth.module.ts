@@ -11,9 +11,9 @@ import { MailService } from '@/libs/mail/mail.service'
 import { UserService } from '@/user/user.service'
 
 import { EmailConfirmationModule } from './email-confirmation/email-confirmation.module'
+import { PasswordRecoveryModule } from './password-recovery/password-recovery.module'
 import { ProviderModule } from './provider/provider.module'
-import { PasswordRecoveryModule } from './password-recovery/password-recovery.module';
-import { TwoFactorModule } from './two-factor/two-factor.module';
+import { TwoFactorModule } from './two-factor/two-factor.module'
 
 @Module({
   controllers: [AuthController],
