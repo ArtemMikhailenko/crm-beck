@@ -43,8 +43,12 @@ COPY --from=build /app/node_modules ./node_modules
 # Copy built application from build stage
 COPY --from=build /app/dist ./dist
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 # Expose port
 EXPOSE 8080
 
-# Start the application
-CMD ["node", "dist/src/main.js"]
+# Use entrypoint script to run migrations and start app
+ENTRYPOINT ["./docker-entrypoint.sh"]
