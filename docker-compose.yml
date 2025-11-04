@@ -16,23 +16,8 @@ services:
     networks:
       - backend
 
-  redis:
-    container_name: redis
-    image: redis:6.2
-    restart: always
-    environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    ports:
-      - 6379:6379
-    command: redis-server --requirepass ${REDIS_PASSWORD}
-    volumes:
-      - redis_data:/data
-    networks:
-      - backend
-
 volumes:
   postgres_data:
-  redis_data:
 
 networks:
   backend:

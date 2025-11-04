@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import { AuthMethod, TokenType } from '@prisma/__generated__'
+import { AuthMethod, TokenType } from '@prisma/client'
 import { hash } from 'argon2'
 
 import { RecoveryPasswordDto } from '@/auth/password-recovery/dto/recovery-password.dto'
@@ -112,10 +112,10 @@ export class PasswordRecoveryService {
       throw new BadRequestException("User with current method doesn't exist.")
     }
 
-    const password = await hash(dto.password)
+    const passwordHash = await hash(dto.password)
     await this.db.user.update({
       where: { id: user.id },
-      data: { password }
+      data: { passwordHash }
     })
 
     await this.db.token.delete({

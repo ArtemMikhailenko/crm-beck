@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "./__generated__"
 }
 
 datasource db {
@@ -8,30 +7,410 @@ datasource db {
   url      = env("POSTGRES_URI")
 }
 
+enum CompanyType {
+  CUSTOMER
+  SUBCONTRACTOR
+  INTERNAL
+}
+
+enum RateType {
+  HOUR
+  KPL
+  M2
+  M3
+}
+
+enum PermissionLevel {
+  FORBIDDEN
+  LIMITED
+  AUTHORIZED
+}
+
+enum ProjectStatus {
+  PLANNING
+  REVIEW
+  PROCESS
+  PAUSE
+  REUSE
+  COMPLETED
+  CANCELLED
+}
+
+enum TimeEntryStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum TimeSource {
+  MANUAL
+  TIMER
+}
+
+enum VacationType {
+  ANNUAL
+  SICK
+  UNPAID
+  MATERNITY
+  PATERNITY
+  STUDY
+  EMERGENCY
+  PAID
+  WEEKEND
+}
+
+enum VacationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  REQUESTED
+  CANCELED
+}
+
+enum UserLegacyRole {
+  REGULAR
+  ADMIN
+}
+
+enum AuthMethod {
+  CREDENTIALS
+  GOOGLE
+}
+
+enum TokenType {
+  VERIFICATION
+  TWO_FACTOR
+  PASSWORD_RESET
+}
+
 model User {
-  id String @id @default(uuid())
+  id           String    @id @default(cuid())
+  email        String    @unique
+  phone        String?   @db.VarChar(64)
+  passwordHash String    @map("password_hash")
+  firstName    String?   @map("first_name")
+  lastName     String?   @map("last_name")
+  displayName  String    @map("display_name")
+  avatarUrl    String?   @map("avatar_url")
+  picture      String?
+  description  String?   @db.VarChar(1000)
+  status       String    @default("active")
+  timezone     String?   @default("Europe/Kiev")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  email    String @unique
-  password String
+  // Company relationship
+  companyId String?  @map("company_id")
+  company   Company? @relation("UserCompany", fields: [companyId], references: [id])
 
-  displayName String
-  picture     String?
+  // Rates and work information
+  ratePerHour        Decimal? @map("rate_per_hour") @db.Decimal(10, 2)
+  ratePerLinearMeter Decimal? @map("rate_per_linear_meter") @db.Decimal(10, 2)
+  ratePerM2          Decimal? @map("rate_per_m2") @db.Decimal(10, 2)
+  workTypes          String[] @map("work_types")
+  workSchedule       Json?    @map("work_schedule")
 
-  role UserRole @default(REGULAR)
+  // Legacy fields for backward compatibility
+  legacyRole         UserLegacyRole @default(REGULAR) @map("role")
+  isVerified         Boolean        @default(false) @map("is_verified")
+  isTwoFactorEnabled Boolean        @default(false) @map("is_two_factor_enabled")
+  method             AuthMethod
 
-  isVerified         Boolean @default(false) @map("is_verified")
-  isTwoFactorEnabled Boolean @default(false) @map("is_two_factor_enabled")
+  // New relationships
+  userRoles         UserRole[]
+  memberships       UserCompanyMembership[]
+  rates             Rate[]
+  schedules         Schedule[]
+  timeEntries       TimeEntry[]
+  managedProjects   Project[]                @relation("ProjectManager")
+  vacations         Vacation[]
+  vacationsCovering Vacation[]               @relation("VacationCoveringUser")
+  vacationsApproved Vacation[]               @relation("VacationApprovedBy")
+  notifications     Notification[]
+  preferences       NotificationPreference[]
+  auditLogs         AuditLog[]               @relation("AuditActor")
+  timesheets        Timesheet[]
 
-  method AuthMethod
+  // New user management relationships
+  contacts      UserContact[]      @relation("UserContacts")
+  userVacations UserVacation[]     @relation("UserVacations")
+  alertSettings UserAlertSetting[] @relation("UserAlertSettings")
 
+  // Legacy relationships
   accounts Account[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
+model Role {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  isSystem    Boolean          @default(false) @map("is_system")
+  isActive    Boolean          @default(true) @map("is_active")
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@unique([name])
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  key         String           @unique // e.g. users:view
+  description String?
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String          @map("role_id")
+  permissionId String          @map("permission_id")
+  level        PermissionLevel @default(FORBIDDEN)
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId     String   @map("user_id")
+  roleId     String   @map("role_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  user       User     @relation(fields: [userId], references: [id])
+  role       Role     @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Company {
+  id        String      @id @default(cuid())
+  name      String
+  type      CompanyType @default(SUBCONTRACTOR)
+  taxId     String?     @map("tax_id") @db.VarChar(64)
+  iban      String?     @db.VarChar(64)
+  address   String?
+  status    String      @default("active")
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  contacts       CompanyContact[]
+  users          User[]                  @relation("UserCompany")
+  members        UserCompanyMembership[]
+  documents      Document[]
+  timeEntries    TimeEntry[]
+  clientProjects Project[]               @relation("ClientProjects")
+
+  @@map("companies")
+}
+
+model CompanyContact {
+  id        String  @id @default(cuid())
+  companyId String  @map("company_id")
+  fullName  String  @map("full_name")
+  email     String?
+  phone     String?
+  position  String?
+  company   Company @relation(fields: [companyId], references: [id])
+
+  @@map("company_contacts")
+}
+
+model UserCompanyMembership {
+  id        String  @id @default(cuid())
+  userId    String  @map("user_id")
+  companyId String  @map("company_id")
+  position  String?
+  isPrimary Boolean @default(false) @map("is_primary")
+  user      User    @relation(fields: [userId], references: [id])
+  company   Company @relation(fields: [companyId], references: [id])
+
+  @@unique([userId, companyId])
+  @@map("user_company_memberships")
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  projectId   String        @unique @map("project_id") // Числовой или строковый ID для отображения (например "8861")
+  name        String // "Binford Ltd.", "Acme Co."
+  clientId    String        @map("client_id") // ID компании-заказчика
+  managerId   String?       @map("manager_id") // ID менеджера проекта
+  status      ProjectStatus @default(PLANNING)
+  description String?       @db.Text
+  startDate   DateTime?     @map("start_date")
+  endDate     DateTime?     @map("end_date")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  client      Company     @relation("ClientProjects", fields: [clientId], references: [id])
+  manager     User?       @relation("ProjectManager", fields: [managerId], references: [id])
+  timeEntries TimeEntry[]
+
+  @@map("projects")
+}
+
+model Rate {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  type      RateType
+  value     Decimal   @db.Decimal(12, 2)
+  currency  String    @default("USD")
+  validFrom DateTime  @map("valid_from")
+  validTo   DateTime? @map("valid_to")
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@map("rates")
+}
+
+model Schedule {
+  id        String        @id @default(cuid())
+  userId    String        @map("user_id")
+  name      String
+  timezone  String        @default("Europe/Kyiv")
+  isDefault Boolean       @default(false) @map("is_default")
+  days      ScheduleDay[]
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@map("schedules")
+}
+
+model ScheduleDay {
+  id         String   @id @default(cuid())
+  scheduleId String   @map("schedule_id")
+  weekday    Int // 1=Mon ... 7=Sun
+  workStart  String?  @map("work_start") // "09:00"
+  workEnd    String?  @map("work_end")
+  lunchStart String?  @map("lunch_start")
+  lunchEnd   String?  @map("lunch_end")
+  isDayOff   Boolean  @default(false) @map("is_day_off")
+  schedule   Schedule @relation(fields: [scheduleId], references: [id])
+
+  @@map("schedule_days")
+}
+
+model TimeEntry {
+  id              String          @id @default(cuid())
+  userId          String          @map("user_id")
+  date            DateTime
+  startAt         DateTime?       @map("start_at")
+  endAt           DateTime?       @map("end_at")
+  breakMinutes    Int?            @default(0) @map("break_minutes")
+  durationMinutes Int?            @default(0) @map("duration_minutes")
+  companyId       String?         @map("company_id")
+  status          TimeEntryStatus @default(DRAFT)
+  source          TimeSource      @default(MANUAL)
+  notes           String?
+  user            User            @relation(fields: [userId], references: [id])
+  company         Company?        @relation(fields: [companyId], references: [id])
+  Project         Project?        @relation(fields: [projectId], references: [id])
+  projectId       String?
+
+  @@index([userId, date])
+  @@map("time_entries")
+}
+
+model Timesheet {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  weekStartDate DateTime @map("week_start_date")
+  weekEndDate   DateTime @map("week_end_date")
+  status        String   @default("submitted")
+  totalMinutes  Int      @default(0) @map("total_minutes")
+  totalHours    Float    @default(0) @map("total_hours")
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, weekStartDate])
+  @@map("timesheets")
+}
+
+model Vacation {
+  id               String         @id @default(cuid())
+  userId           String         @map("user_id")
+  startDate        DateTime       @map("start_date")
+  endDate          DateTime       @map("end_date")
+  type             VacationType
+  status           VacationStatus @default(REQUESTED)
+  workingDays      Int            @default(0) @map("working_days")
+  calendarDays     Int            @default(0) @map("calendar_days")
+  reason           String?        @db.VarChar(1000)
+  emergencyContact String?        @map("emergency_contact") @db.VarChar(200)
+  managerComment   String?        @map("manager_comment") @db.VarChar(1000)
+  coveringUserId   String?        @map("covering_user_id")
+  approvedById     String?        @map("approved_by_id")
+  approvedAt       DateTime?      @map("approved_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  user         User  @relation(fields: [userId], references: [id])
+  coveringUser User? @relation("VacationCoveringUser", fields: [coveringUserId], references: [id])
+  approvedBy   User? @relation("VacationApprovedBy", fields: [approvedById], references: [id])
+
+  @@map("vacations")
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  ownerType  String   @map("owner_type") // user|company|project
+  ownerId    String   @map("owner_id")
+  title      String
+  mime       String
+  size       Int
+  storageKey String   @map("storage_key")
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  company    Company? @relation(fields: [ownerId], references: [id])
+
+  @@map("documents")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  channel   String // email|inapp
+  type      String
+  payload   Json
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id      String  @id @default(cuid())
+  userId  String  @map("user_id")
+  type    String
+  enabled Boolean @default(true)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([userId, type])
+  @@map("notification_preferences")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?  @map("actor_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  before     Json?
+  after      Json?
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// Legacy models for backward compatibility
 model Account {
   id String @id @default(uuid())
 
@@ -64,18 +443,51 @@ model Token {
   @@map("tokens")
 }
 
-enum UserRole {
-  REGULAR
-  ADMIN
+// User Contacts - контакты пользователя
+model UserContact {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  name      String   @db.VarChar(200)
+  phone     String?  @db.VarChar(64)
+  email     String?  @db.VarChar(200)
+  relation  String?  @db.VarChar(100) // Отношение (друг, родственник, коллега и т.д.)
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation("UserContacts", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_contacts")
 }
 
-enum AuthMethod {
-  CREDENTIALS
-  GOOGLE
+// User Vacations - дополнительная таблица для упрощенного управления отпусками
+model UserVacation {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  title       String   @db.VarChar(200)
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+  description String?  @db.VarChar(1000)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation("UserVacations", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_vacations")
 }
 
-enum TokenType {
-  VERIFICATION
-  TWO_FACTOR
-  PASSWORD_RESET
+// User Alert Settings - настройки уведомлений пользователя
+model UserAlertSetting {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  alertType String   @map("alert_type") @db.VarChar(100) // email, sms, push, etc.
+  category  String   @db.VarChar(100) // vacation, timesheet, schedule, etc.
+  isEnabled Boolean  @default(true) @map("is_enabled")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation("UserAlertSettings", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, alertType, category])
+  @@map("user_alert_settings")
 }

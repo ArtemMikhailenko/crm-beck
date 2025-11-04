@@ -7,7 +7,7 @@ import { isDev } from '@/libs/common/utils/is-dev.utils'
 export const getRecaptchaConfig = (
   configService: ConfigService
 ): GoogleRecaptchaModuleOptions => ({
-  secretKey: configService.get('GOOGLE_RECAPTCHA_SECRET_KEY'),
+  secretKey: configService.get('GOOGLE_RECAPTCHA_SECRET_KEY') || 'test_secret_key',
   response: (req: Request) => req.headers.recaptcha as string,
-  skipIf: isDev(configService)
+  skipIf: isDev(configService) || !configService.get('GOOGLE_RECAPTCHA_SECRET_KEY')
 })

@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common'
-import { TokenType } from '@prisma/__generated__'
+import { TokenType } from '@prisma/client'
 
 import { generateSixDigitNumberInRange } from '@/libs/common/utils/generate-random.util'
 import { MailService } from '@/libs/mail/mail.service'

@@ -8,7 +8,7 @@ import {
   UnauthorizedException
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { AuthMethod, User } from '@prisma/__generated__'
+import { AuthMethod, User } from '@prisma/client'
 import { verify } from 'argon2'
 import { Request, Response } from 'express'
 
@@ -48,37 +48,38 @@ export class AuthService {
       dto.name,
       null,
       AuthMethod.CREDENTIALS,
-      false
+      true // TODO: Temporarily set to true - change back to false when email verification is re-enabled
     )
 
-    await this.emailConfirmationService.sendVerificationToken(newUser)
+    // TODO: Temporarily disabled email verification - re-enable later  
+    // await this.emailConfirmationService.sendVerificationToken(newUser)
 
     return {
-      message:
-        'User created successfully. Please confirm your email. Message was sent to your email'
+      message: 'User created successfully. You can now login with your credentials.'
     }
   }
 
   public async login(req: Request, dto: LoginDto) {
     const user = await this.userService.findByEmail(dto.email)
 
-    if (!user || !user.password) {
+    if (!user || !user.passwordHash) {
       throw new NotFoundException('User not found or password is not set')
     }
 
-    const isPasswordValid = await verify(user.password, dto.password)
+    const isPasswordValid = await verify(user.passwordHash, dto.password)
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid password')
     }
 
-    if (!user.isVerified) {
-      await this.emailConfirmationService.sendVerificationToken(user)
+    // TODO: Temporarily disabled email verification - re-enable later
+    // if (!user.isVerified) {
+    //   await this.emailConfirmationService.sendVerificationToken(user)
 
-      throw new UnauthorizedException(
-        'Email is not verified. Please confirm your email.'
-      )
-    }
+    //   throw new UnauthorizedException(
+    //     'Email is not verified. Please confirm your email.'
+    //   )
+    // }
 
     if (user.isTwoFactorEnabled) {
       if (!dto.token) {

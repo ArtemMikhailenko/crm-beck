@@ -4,7 +4,7 @@ import {
   Injectable,
   UnauthorizedException
 } from '@nestjs/common'
-import { User } from '@prisma/__generated__'
+import { User } from '@prisma/client'
 import { Request } from 'express'
 import { Session } from 'express-session'
 
