@@ -40,8 +40,14 @@ COPY prisma ./prisma
 # Install only production dependencies
 RUN pnpm install --prod --frozen-lockfile
 
+# Install Prisma CLI temporarily for generating client
+RUN pnpm add -D prisma
+
 # Generate Prisma Client in production stage
 RUN pnpm prisma generate
+
+# Remove Prisma CLI to reduce image size
+RUN pnpm remove prisma
 
 # Copy built application
 COPY --from=build /app/dist ./dist
