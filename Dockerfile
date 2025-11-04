@@ -33,23 +33,18 @@ RUN npm install -g pnpm@10
 
 WORKDIR /app
 
-# Copy package files and prisma schema
+# Copy package files
 COPY package.json pnpm-lock.yaml ./
-COPY prisma ./prisma
 
 # Install only production dependencies
 RUN pnpm install --prod --frozen-lockfile
 
-# Install Prisma CLI temporarily for generating client
-RUN pnpm add -D prisma
+# Copy Prisma schema and generated client from build stage
+COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 
-# Generate Prisma Client in production stage
-RUN pnpm prisma generate
-
-# Remove Prisma CLI to reduce image size
-RUN pnpm remove prisma
-
-# Copy built application
+# Copy built application from build stage
 COPY --from=build /app/dist ./dist
 
 # Expose port
