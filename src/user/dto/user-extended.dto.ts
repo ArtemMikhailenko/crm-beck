@@ -100,10 +100,12 @@ export class CreateUserVacationDto {
   title: string
 
   @ApiProperty({ description: 'Дата начала', example: '2024-12-01T00:00:00Z' })
+  @IsNotEmpty()
   @Type(() => Date)
   startDate: Date
 
   @ApiProperty({ description: 'Дата окончания', example: '2024-12-15T00:00:00Z' })
+  @IsNotEmpty()
   @Type(() => Date)
   endDate: Date
 

@@ -427,15 +427,25 @@ export class UserService {
   public async createUserVacation(userId: string, vacationData: any) {
     await this.findById(userId) // Check if user exists
 
+    console.log('Received vacation data:', vacationData)
+    console.log('startDate type:', typeof vacationData?.startDate, vacationData?.startDate)
+    console.log('endDate type:', typeof vacationData?.endDate, vacationData?.endDate)
+
     // Валидация обязательных полей
+    if (!vacationData || typeof vacationData !== 'object') {
+      throw new BadRequestException('Invalid vacation data')
+    }
+    
+    if (!vacationData.title || vacationData.title.trim() === '') {
+      throw new BadRequestException('title is required')
+    }
+    
     if (!vacationData.startDate) {
       throw new BadRequestException('startDate is required')
     }
+    
     if (!vacationData.endDate) {
       throw new BadRequestException('endDate is required')
-    }
-    if (!vacationData.title) {
-      throw new BadRequestException('title is required')
     }
 
     return this.db.userVacation.create({
