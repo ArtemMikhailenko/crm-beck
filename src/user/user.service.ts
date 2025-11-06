@@ -331,6 +331,11 @@ export class UserService {
   public async createUserContact(userId: string, contactData: any) {
     await this.findById(userId) // Check if user exists
 
+    // Валидация обязательных полей
+    if (!contactData.name) {
+      throw new BadRequestException('name is required')
+    }
+
     // If this contact is marked as primary, unmark all other contacts
     if (contactData.isPrimary) {
       await this.db.userContact.updateMany({
@@ -342,7 +347,11 @@ export class UserService {
     return this.db.userContact.create({
       data: {
         userId,
-        ...contactData
+        name: contactData.name,
+        phone: contactData.phone || null,
+        email: contactData.email || null,
+        relation: contactData.relation || null,
+        isPrimary: contactData.isPrimary || false
       }
     })
   }
@@ -364,9 +373,28 @@ export class UserService {
       })
     }
 
+    // Подготавливаем данные для обновления (только разрешенные поля)
+    const updateData: any = {}
+    
+    if (contactData.name !== undefined) {
+      updateData.name = contactData.name
+    }
+    if (contactData.phone !== undefined) {
+      updateData.phone = contactData.phone
+    }
+    if (contactData.email !== undefined) {
+      updateData.email = contactData.email
+    }
+    if (contactData.relation !== undefined) {
+      updateData.relation = contactData.relation
+    }
+    if (contactData.isPrimary !== undefined) {
+      updateData.isPrimary = contactData.isPrimary
+    }
+
     return this.db.userContact.update({
       where: { id: contactId },
-      data: contactData
+      data: updateData
     })
   }
 
@@ -399,10 +427,24 @@ export class UserService {
   public async createUserVacation(userId: string, vacationData: any) {
     await this.findById(userId) // Check if user exists
 
+    // Валидация обязательных полей
+    if (!vacationData.startDate) {
+      throw new BadRequestException('startDate is required')
+    }
+    if (!vacationData.endDate) {
+      throw new BadRequestException('endDate is required')
+    }
+    if (!vacationData.title) {
+      throw new BadRequestException('title is required')
+    }
+
     return this.db.userVacation.create({
       data: {
         userId,
-        ...vacationData
+        title: vacationData.title,
+        startDate: new Date(vacationData.startDate),
+        endDate: new Date(vacationData.endDate),
+        description: vacationData.description || null
       }
     })
   }
@@ -416,9 +458,25 @@ export class UserService {
       throw new NotFoundException('Vacation not found')
     }
 
+    // Подготавливаем данные для обновления (только разрешенные поля)
+    const updateData: any = {}
+    
+    if (vacationData.title !== undefined) {
+      updateData.title = vacationData.title
+    }
+    if (vacationData.startDate !== undefined) {
+      updateData.startDate = new Date(vacationData.startDate)
+    }
+    if (vacationData.endDate !== undefined) {
+      updateData.endDate = new Date(vacationData.endDate)
+    }
+    if (vacationData.description !== undefined) {
+      updateData.description = vacationData.description
+    }
+
     return this.db.userVacation.update({
       where: { id: vacationId },
-      data: vacationData
+      data: updateData
     })
   }
 
