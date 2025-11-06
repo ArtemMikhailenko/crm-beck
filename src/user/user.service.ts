@@ -161,6 +161,57 @@ export class UserService {
     }
   }
 
+  public async createUser(userData: any) {
+    // Проверяем, существует ли пользователь с таким email
+    const existingUser = await this.db.user.findUnique({
+      where: { email: userData.email }
+    })
+
+    if (existingUser) {
+      throw new ConflictException('Пользователь с таким email уже существует')
+    }
+
+    // Хешируем пароль, если он предоставлен
+    const passwordHash = userData.password ? await hash(userData.password) : ''
+
+    // Создаем пользователя
+    const user = await this.db.user.create({
+      data: {
+        email: userData.email,
+        passwordHash,
+        displayName: userData.displayName || userData.email,
+        picture: userData.picture || '',
+        method: userData.method || 'credentials',
+        isVerified: userData.isVerified || false,
+        companyId: userData.companyId || null,
+        firstName: userData.firstName || null,
+        lastName: userData.lastName || null,
+        middleName: userData.middleName || null,
+        phone: userData.phone || null,
+        dateOfBirth: userData.dateOfBirth || null,
+        hireDate: userData.hireDate || null,
+        position: userData.position || null,
+        employmentType: userData.employmentType || null,
+        status: userData.status || 'active'
+      },
+      include: {
+        company: true,
+        userRoles: {
+          include: {
+            role: true
+          }
+        }
+      }
+    })
+
+    // Если указаны роли, назначаем их
+    if (userData.roleIds && userData.roleIds.length > 0) {
+      await this.assignRoles(user.id, userData.roleIds)
+    }
+
+    return user
+  }
+
   public async updateUser(id: string, updateData: any) {
     // Временная реализация
     const user = await this.findById(id)
