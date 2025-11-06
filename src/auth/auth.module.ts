@@ -1,6 +1,7 @@
 import { forwardRef, Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { ConfigService } from '@nestjs/config'
+import { JwtModule } from '@nestjs/jwt'
 import { GoogleRecaptchaModule } from '@nestlab/google-recaptcha'
 
 import { AuthController } from '@/auth/auth.controller'
@@ -20,6 +21,16 @@ import { TwoFactorModule } from './two-factor/two-factor.module'
   providers: [AuthService, UserService, MailService],
   imports: [
     forwardRef(() => EmailConfirmationModule),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
+        signOptions: {
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '7d') as any
+        }
+      }),
+      inject: [ConfigService]
+    }),
     ProviderModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) =>

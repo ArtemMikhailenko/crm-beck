@@ -32,7 +32,7 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  public async register(@Body() dto: RegisterDto) {
+  public async register(@Body() dto: RegisterDto, @Req() req: Request) {
     return this.authService.register(dto)
   }
 
@@ -50,11 +50,15 @@ export class AuthController {
       )
     }
 
-    await this.authService.extractProfileFromCode(req, provider, code)
+    const user = await this.authService.extractProfileFromCode(req, provider, code)
+    
+    // Generate JWT token
+    const tokens = await this.authService.generateTokens(user)
+    
+    // Redirect to frontend with token in URL
+    const redirectUrl = `${this.configService.getOrThrow<string>('ALLOWED_ORIGIN')}/dashboard?accessToken=${tokens.accessToken}`
 
-    return res.redirect(
-      `${this.configService.getOrThrow<string>('ALLOWED_ORIGIN')}/dashboard`
-    )
+    return res.redirect(redirectUrl)
   }
 
   @Get('/oauth/connect/:provider')

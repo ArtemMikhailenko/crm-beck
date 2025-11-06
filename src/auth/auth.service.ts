@@ -8,6 +8,7 @@ import {
   UnauthorizedException
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { JwtService } from '@nestjs/jwt'
 import { AuthMethod, User } from '@prisma/client'
 import { verify } from 'argon2'
 import { Request, Response } from 'express'
@@ -28,6 +29,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly providerService: ProviderService,
     private readonly db: PrismaService,
+    private readonly jwtService: JwtService,
     @Inject(forwardRef(() => EmailConfirmationService))
     private readonly emailConfirmationService: EmailConfirmationService,
     private readonly twoFactorService: TwoFactorService
@@ -54,8 +56,12 @@ export class AuthService {
     // TODO: Temporarily disabled email verification - re-enable later  
     // await this.emailConfirmationService.sendVerificationToken(newUser)
 
+    const tokens = await this.generateTokens(newUser)
+
     return {
-      message: 'User created successfully. You can now login with your credentials.'
+      message: 'User created successfully. You can now login with your credentials.',
+      ...tokens,
+      user: this.sanitizeUser(newUser)
     }
   }
 
@@ -98,7 +104,12 @@ export class AuthService {
 
     await this.saveSession(req, user)
 
-    return user
+    const tokens = await this.generateTokens(user)
+
+    return {
+      ...tokens,
+      user: this.sanitizeUser(user)
+    }
   }
 
   public async extractProfileFromCode(
@@ -122,7 +133,8 @@ export class AuthService {
       : null
 
     if (user) {
-      return this.saveSession(req, user)
+      await this.saveSession(req, user)
+      return user
     }
 
     user = await this.userService.create(
@@ -147,7 +159,8 @@ export class AuthService {
       })
     }
 
-    return this.saveSession(req, user)
+    await this.saveSession(req, user)
+    return user
   }
 
   public async logout(req: Request, res: Response): Promise<void> {
@@ -180,5 +193,25 @@ export class AuthService {
         resolve({ user })
       })
     })
+  }
+
+  public async generateTokens(user: User) {
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      name: user.displayName
+    }
+
+    const accessToken = await this.jwtService.signAsync(payload)
+
+    return {
+      accessToken,
+      tokenType: 'Bearer'
+    }
+  }
+
+  public sanitizeUser(user: User) {
+    const { passwordHash, ...sanitizedUser } = user
+    return sanitizedUser
   }
 }
