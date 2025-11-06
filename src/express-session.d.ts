@@ -5,3 +5,8 @@ declare module 'express-session' {
     userId?: string
   }
 }
+
+// Fix BigInt serialization
+interface BigInt {
+  toJSON(): string
+}

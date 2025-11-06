@@ -10,6 +10,12 @@ import { AppModule } from '@/app.module'
 import { ms, StringValue } from '@/libs/common/utils/ms.util'
 import { parseBoolean } from '@/libs/common/utils/parse-boolean.util'
 
+// Fix BigInt serialization issue
+// @ts-ignore
+BigInt.prototype.toJSON = function() {
+  return this.toString()
+}
+
 const PgSession = connectPg(session)
 
 async function bootstrap() {
