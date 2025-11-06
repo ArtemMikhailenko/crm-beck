@@ -9,9 +9,12 @@ import {
   Post,
   Delete,
   Query,
-  Patch
+  Patch,
+  Req,
+  UnauthorizedException
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger'
+import { Request } from 'express'
 
 import { Authorization } from '@/auth/decorators/auth.decorator'
 import { Authorized } from '@/auth/decorators/authorizated.decorator'
@@ -39,7 +42,12 @@ export class UserController {
   // @Authorization()
   @ApiOperation({ summary: 'Получить собственный профиль' })
   @ApiResponse({ status: 200, description: 'Профиль пользователя' })
-  public async findProfile(@Authorized('id') userId: string) {
+  public async findProfile(@Req() req: Request) {
+    // Temporarily return user from session if exists, otherwise return error
+    const userId = (req.session as any)?.userId
+    if (!userId) {
+      throw new UnauthorizedException('User not authenticated')
+    }
     return this.userService.findById(userId)
   }
 
