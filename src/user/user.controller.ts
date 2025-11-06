@@ -35,7 +35,8 @@ export class UserController {
 
   @Get('profile')
   @HttpCode(HttpStatus.OK)
-  @Authorization()
+  // TODO: Temporarily disabled authorization - re-enable later with proper token system
+  // @Authorization()
   @ApiOperation({ summary: 'Получить собственный профиль' })
   @ApiResponse({ status: 200, description: 'Профиль пользователя' })
   public async findProfile(@Authorized('id') userId: string) {
