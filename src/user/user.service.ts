@@ -174,25 +174,23 @@ export class UserService {
     // Хешируем пароль, если он предоставлен
     const passwordHash = userData.password ? await hash(userData.password) : ''
 
-    // Создаем пользователя
+    // Создаем пользователя (только поля, которые существуют в схеме)
     const user = await this.db.user.create({
       data: {
         email: userData.email,
         passwordHash,
         displayName: userData.displayName || userData.email,
-        picture: userData.picture || '',
-        method: userData.method || 'credentials',
+        picture: userData.picture || null,
+        method: userData.method || 'CREDENTIALS',
         isVerified: userData.isVerified || false,
         companyId: userData.companyId || null,
         firstName: userData.firstName || null,
         lastName: userData.lastName || null,
-        middleName: userData.middleName || null,
         phone: userData.phone || null,
-        dateOfBirth: userData.dateOfBirth || null,
-        hireDate: userData.hireDate || null,
-        position: userData.position || null,
-        employmentType: userData.employmentType || null,
-        status: userData.status || 'active'
+        status: userData.status || 'active',
+        avatarUrl: userData.avatarUrl || null,
+        description: userData.description || null,
+        timezone: userData.timezone || 'Europe/Kiev'
       },
       include: {
         company: true,
