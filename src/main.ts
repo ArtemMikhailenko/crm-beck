@@ -54,8 +54,15 @@ async function bootstrap() {
     })
   )
 
+  // Allow multiple origins via comma-separated ALLOWED_ORIGIN
+  const allowedOriginRaw = config.getOrThrow<string>('ALLOWED_ORIGIN')
+  const allowedOrigins = allowedOriginRaw
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean)
+
   app.enableCors({
-    origin: config.getOrThrow<string>('ALLOWED_ORIGIN'),
+    origin: allowedOrigins.length > 1 ? allowedOrigins : allowedOrigins[0],
     credentials: true,
     exposedHeaders: ['set-cookie']
   })
