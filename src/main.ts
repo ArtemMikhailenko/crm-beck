@@ -54,17 +54,25 @@ async function bootstrap() {
     })
   )
 
-  // Allow multiple origins via comma-separated ALLOWED_ORIGIN
-  const allowedOriginRaw = config.getOrThrow<string>('ALLOWED_ORIGIN')
-  const allowedOrigins = allowedOriginRaw
+  // Enable CORS for multiple origins (comma-separated in ALLOWED_ORIGIN)
+  const allowedOrigins = (config.get<string>('ALLOWED_ORIGIN') || '')
     .split(',')
     .map(o => o.trim())
     .filter(Boolean)
 
   app.enableCors({
-    origin: allowedOrigins.length > 1 ? allowedOrigins : allowedOrigins[0],
+    origin: (origin, callback) => {
+      // Allow non-browser clients or same-origin (no Origin header)
+      if (!origin) return callback(null, true)
+      if (allowedOrigins.includes(origin)) return callback(null, true)
+      return callback(new Error(`CORS blocked: ${origin} not in ALLOWED_ORIGIN`), false)
+    },
     credentials: true,
-    exposedHeaders: ['set-cookie']
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['set-cookie'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 
   // Setup Swagger
