@@ -163,17 +163,14 @@ export class UserController {
 
   @Put('password')
   @HttpCode(HttpStatus.OK)
-  // TODO: Temporarily disabled for testing - re-enable later
-  // @Authorization()
+  @Authorization()
   @ApiOperation({ summary: 'Изменить пароль' })
   @ApiResponse({ status: 200, description: 'Пароль успешно изменен' })
   @ApiResponse({ status: 401, description: 'Неверный текущий пароль' })
   public async changePassword(
-    // @Authorized('id') id: string,
+    @Authorized('id') id: string,
     @Body() dto: ChangePasswordDto
   ) {
-    // TODO: Get user ID from token/session when authentication is implemented
-    const id = 'temp-user-id'
     return this.userService.changePassword(id, dto)
   }
 

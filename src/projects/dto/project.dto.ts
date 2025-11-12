@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsDateString } from 'class-validator'
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsDateString, IsArray, ArrayUnique } from 'class-validator'
 
 export enum ProjectStatus {
   PLANNING = 'PLANNING',
@@ -51,6 +51,15 @@ export class CreateProjectDto {
   @IsDateString()
   @IsOptional()
   endDate?: string
+
+  @ApiPropertyOptional({
+    example: ['subc1', 'subc2'],
+    description: 'IDs компаний-субподрядчиков'
+  })
+  @IsArray()
+  @ArrayUnique()
+  @IsOptional()
+  subcontractorIds?: string[]
 }
 
 export class UpdateProjectDto {
@@ -88,6 +97,15 @@ export class UpdateProjectDto {
   @IsDateString()
   @IsOptional()
   endDate?: string
+
+  @ApiPropertyOptional({
+    example: ['subc1', 'subc3'],
+    description: 'Полная замена списка субподрядчиков (опционально)'
+  })
+  @IsArray()
+  @ArrayUnique()
+  @IsOptional()
+  subcontractorIds?: string[]
 }
 
 export class ProjectQueryDto {
@@ -123,4 +141,9 @@ export class ProjectQueryDto {
   @IsString()
   @IsOptional()
   sort?: string
+
+  @ApiPropertyOptional({ example: 'subc1', description: 'Фильтр по ID субподрядчика' })
+  @IsString()
+  @IsOptional()
+  subcontractorId?: string
 }

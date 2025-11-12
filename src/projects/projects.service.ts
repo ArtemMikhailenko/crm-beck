@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
+import { CompanyType } from '@prisma/client'
 import { PrismaService } from '@/prisma/prisma.service'
 import { CreateProjectDto, UpdateProjectDto, ProjectQueryDto } from './dto/project.dto'
 
@@ -7,13 +8,20 @@ export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createProjectDto: CreateProjectDto) {
-    // Verify client exists
-    const client = await this.prisma.company.findUnique({
-      where: { id: createProjectDto.clientId },
-    })
+    // Resolve client: accept either existing company ID or a free-text name to auto-create CUSTOMER
+    let clientId = createProjectDto.clientId
+    let client = await this.prisma.company.findUnique({ where: { id: clientId } })
 
     if (!client) {
-      throw new NotFoundException(`Client company with ID '${createProjectDto.clientId}' not found`)
+      // Treat provided value as a name; find by name or create a new CUSTOMER company
+      const asName = clientId.trim()
+      client = await this.prisma.company.findFirst({ where: { name: asName } })
+      if (!client) {
+        client = await this.prisma.company.create({
+          data: { name: asName, type: CompanyType.CUSTOMER },
+        })
+      }
+      clientId = client.id
     }
 
     // Verify manager exists if provided
@@ -36,9 +44,14 @@ export class ProjectsService {
       throw new BadRequestException(`Project with ID '${createProjectDto.projectId}' already exists`)
     }
 
-    return this.prisma.project.create({
+    const created = await this.prisma.project.create({
       data: {
-        ...createProjectDto,
+        projectId: createProjectDto.projectId,
+        name: createProjectDto.name,
+        clientId,
+        managerId: createProjectDto.managerId ?? null,
+        status: createProjectDto.status,
+        description: createProjectDto.description,
         startDate: createProjectDto.startDate ? new Date(createProjectDto.startDate) : null,
         endDate: createProjectDto.endDate ? new Date(createProjectDto.endDate) : null,
       },
@@ -57,12 +70,38 @@ export class ProjectsService {
             displayName: true,
           },
         },
+        // @ts-ignore - prisma types may lag before generate
+        subcontractors: {
+          select: {
+            subcontractor: { select: { id: true, name: true } }
+          }
+        }
       },
     })
+
+    // Handle subcontractors assignment
+    if (createProjectDto.subcontractorIds && createProjectDto.subcontractorIds.length > 0) {
+      const uniqueIds = Array.from(new Set(createProjectDto.subcontractorIds))
+
+      const subs = await this.prisma.company.findMany({
+        where: { id: { in: uniqueIds }, type: CompanyType.SUBCONTRACTOR }
+      })
+
+      if (subs.length !== uniqueIds.length) {
+        throw new BadRequestException('One or more subcontractors not found or not of type SUBCONTRACTOR')
+      }
+
+      // @ts-ignore - prisma types may lag before generate
+      await this.prisma.projectSubcontractor.createMany({
+        data: uniqueIds.map((sid) => ({ projectId: created.id, subcontractorId: sid }))
+      })
+    }
+
+    return this.findOne(created.id)
   }
 
   async findAll(query: ProjectQueryDto) {
-    const { clientId, managerId, status, search, page = 1, pageSize = 10, sort } = query
+  const { clientId, managerId, status, search, page = 1, pageSize = 10, sort, subcontractorId } = query
 
     const where: any = {}
 
@@ -76,6 +115,10 @@ export class ProjectsService {
 
     if (status) {
       where.status = status
+    }
+
+    if (subcontractorId) {
+      where.subcontractors = { some: { subcontractorId } }
     }
 
     if (search) {
@@ -93,8 +136,10 @@ export class ProjectsService {
       orderBy = { [field]: direction || 'asc' }
     }
 
-    const skip = (page - 1) * pageSize
-    const take = pageSize
+  const pageNum = typeof page === 'string' ? parseInt(page as any, 10) : page
+  const pageSizeNum = typeof pageSize === 'string' ? parseInt(pageSize as any, 10) : pageSize
+  const skip = (pageNum - 1) * pageSizeNum
+  const take = pageSizeNum
 
     const [data, total] = await Promise.all([
       this.prisma.project.findMany({
@@ -117,6 +162,12 @@ export class ProjectsService {
               displayName: true,
             },
           },
+          // @ts-ignore - prisma types may lag before generate
+          subcontractors: {
+            select: {
+              subcontractor: { select: { id: true, name: true } }
+            }
+          }
         },
       }),
       this.prisma.project.count({ where }),
@@ -125,9 +176,9 @@ export class ProjectsService {
     return {
       data,
       total,
-      page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
+      page: pageNum,
+      pageSize: pageSizeNum,
+      totalPages: Math.ceil(total / pageSizeNum),
     }
   }
 
@@ -153,6 +204,12 @@ export class ProjectsService {
             email: true,
             phone: true,
           },
+        },
+        // @ts-ignore - prisma types may lag before generate
+        subcontractors: {
+          select: {
+            subcontractor: { select: { id: true, name: true, type: true } }
+          }
         },
         timeEntries: {
           take: 10,
@@ -257,6 +314,76 @@ export class ProjectsService {
     }
 
     return this.findAll({ ...query, clientId })
+  }
+
+  // ===== Subcontractor Management =====
+  async getProjectSubcontractors(projectId: string) {
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } })
+    if (!project) {
+      throw new NotFoundException(`Project with ID '${projectId}' not found`)
+    }
+    // @ts-ignore
+    const links = await this.prisma.projectSubcontractor.findMany({
+      where: { projectId },
+      include: { subcontractor: { select: { id: true, name: true, type: true } } }
+    })
+    return links.map(l => l.subcontractor)
+  }
+
+  async addSubcontractors(projectId: string, subcontractorIds: string[]) {
+    if (!Array.isArray(subcontractorIds) || subcontractorIds.length === 0) {
+      throw new BadRequestException('subcontractorIds must be a non-empty array')
+    }
+
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } })
+    if (!project) {
+      throw new NotFoundException(`Project with ID '${projectId}' not found`)
+    }
+
+    const uniqueIds = Array.from(new Set(subcontractorIds))
+    const subs = await this.prisma.company.findMany({
+      where: { id: { in: uniqueIds }, type: CompanyType.SUBCONTRACTOR }
+    })
+    if (subs.length !== uniqueIds.length) {
+      throw new BadRequestException('One or more subcontractors not found or not of type SUBCONTRACTOR')
+    }
+
+    // Remove already existing links to avoid duplicate id constraint errors
+    // @ts-ignore
+    const existingLinks = await this.prisma.projectSubcontractor.findMany({
+      where: { projectId, subcontractorId: { in: uniqueIds } },
+      select: { subcontractorId: true }
+    })
+    const existingIds = new Set(existingLinks.map(l => l.subcontractorId))
+    const toCreate = uniqueIds.filter(id => !existingIds.has(id))
+
+    if (toCreate.length > 0) {
+      // @ts-ignore
+      await this.prisma.projectSubcontractor.createMany({
+        data: toCreate.map(sid => ({ projectId, subcontractorId: sid }))
+      })
+    }
+
+    return this.getProjectSubcontractors(projectId)
+  }
+
+  async removeSubcontractor(projectId: string, subcontractorId: string) {
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } })
+    if (!project) {
+      throw new NotFoundException(`Project with ID '${projectId}' not found`)
+    }
+    // @ts-ignore
+    const link = await this.prisma.projectSubcontractor.findUnique({
+      where: { projectId_subcontractorId: { projectId, subcontractorId } }
+    })
+    if (!link) {
+      throw new NotFoundException('Subcontractor link not found')
+    }
+    // @ts-ignore
+    await this.prisma.projectSubcontractor.delete({
+      where: { projectId_subcontractorId: { projectId, subcontractorId } }
+    })
+    return { message: 'Subcontractor removed', subcontractors: await this.getProjectSubcontractors(projectId) }
   }
 }
 

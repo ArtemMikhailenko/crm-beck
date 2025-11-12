@@ -92,7 +92,9 @@ export class AuthService {
         await this.twoFactorService.sendTwoFactorToken(user.email)
 
         return {
-          message: 'Two-factor authentication required. Token sent to email.'
+          twoFactorRequired: true,
+          message: 'Требуется двухфакторная аутентификация. Код отправлен на email.',
+          ttlMinutes: this.configService.get<number>('TWO_FACTOR_TOKEN_TTL_MINUTES', 10)
         }
       }
 

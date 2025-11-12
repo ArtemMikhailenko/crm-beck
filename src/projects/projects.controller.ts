@@ -42,9 +42,13 @@ export class ProjectsController {
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
   @ApiQuery({ name: 'pageSize', required: false, type: Number, description: 'Items per page' })
   @ApiQuery({ name: 'sort', required: false, description: 'Sort field and direction (e.g., name:asc)' })
+  @ApiQuery({ name: 'subcontractorId', required: false, description: 'Filter by subcontractor company ID' })
   @Permissions('projects:list')
   async findAll(@Query() query: ProjectQueryDto) {
-    return this.projectsService.findAll(query)
+    // Coerce pagination query params to numbers to satisfy Prisma (skip/take expect Int)
+    const pageNum = query.page === undefined ? undefined : Number(query.page)
+    const pageSizeNum = query.pageSize === undefined ? undefined : Number(query.pageSize)
+    return this.projectsService.findAll({ ...query, page: pageNum, pageSize: pageSizeNum })
   }
 
   @Get(':id')
@@ -53,6 +57,30 @@ export class ProjectsController {
   @Permissions('projects:view')
   async findOne(@Param('id') id: string) {
     return this.projectsService.findOne(id)
+  }
+
+  @Get(':id/subcontractors')
+  @ApiOperation({ summary: 'Get subcontractors for a project' })
+  @ApiResponse({ status: 200, description: 'List of subcontractors for the project' })
+  @Permissions('projects:view')
+  async getSubcontractors(@Param('id') id: string) {
+    return this.projectsService.getProjectSubcontractors(id)
+  }
+
+  @Post(':id/subcontractors')
+  @ApiOperation({ summary: 'Add subcontractors to a project' })
+  @ApiResponse({ status: 200, description: 'Subcontractors added' })
+  @Permissions('projects:update')
+  async addSubcontractors(@Param('id') id: string, @Body('subcontractorIds') subcontractorIds: string[]) {
+    return this.projectsService.addSubcontractors(id, subcontractorIds)
+  }
+
+  @Delete(':id/subcontractors/:companyId')
+  @ApiOperation({ summary: 'Remove subcontractor from a project' })
+  @ApiResponse({ status: 200, description: 'Subcontractor removed' })
+  @Permissions('projects:update')
+  async removeSubcontractor(@Param('id') id: string, @Param('companyId') companyId: string) {
+    return this.projectsService.removeSubcontractor(id, companyId)
   }
 
   @Patch(':id')

@@ -85,6 +85,20 @@ export class UserService {
       }
     })
 
+    // Assign default Admin role if present
+    try {
+      const adminRole = await this.db.role.findFirst({ where: { name: 'Admin' } })
+      if (adminRole) {
+        await this.db.userRole.create({
+          data: { userId: user.id, roleId: adminRole.id }
+        })
+        // reload include
+        return this.findById(user.id)
+      }
+    } catch (e) {
+      // ignore role assignment errors and return created user
+    }
+
     return user
   }
 
@@ -192,22 +206,37 @@ export class UserService {
         description: userData.description || null,
         timezone: userData.timezone || 'Europe/Kiev'
       },
-      include: {
-        company: true,
-        userRoles: {
-          include: {
-            role: true
+        include: {
+          company: true,
+          userRoles: {
+            include: {
+              role: true
+            }
           }
         }
+      })
+
+      // Если указаны роли, назначаем их
+      if (userData.roleIds && userData.roleIds.length > 0) {
+        await this.assignRoles(user.id, userData.roleIds)
+        return this.findById(user.id)
       }
-    })
 
-    // Если указаны роли, назначаем их
-    if (userData.roleIds && userData.roleIds.length > 0) {
-      await this.assignRoles(user.id, userData.roleIds)
-    }
+      // По умолчанию назначаем роль Admin (если существует)
+      try {
+        const adminRole = await this.db.role.findFirst({ where: { name: 'Admin' } })
+        if (adminRole) {
+          await this.db.userRole.upsert({
+            where: { userId_roleId: { userId: user.id, roleId: adminRole.id } },
+            update: {},
+            create: { userId: user.id, roleId: adminRole.id }
+          })
+        }
+      } catch (e) {
+        // ignore
+      }
 
-    return user
+      return this.findById(user.id)
   }
 
   public async updateUser(id: string, updateData: any) {
