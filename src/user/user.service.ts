@@ -301,28 +301,70 @@ export class UserService {
     return { message: 'User deleted successfully' }
   }
 
-  public async assignRoles(userId: string, roleIds: string[]) {
-    const user = await this.findById(userId)
+  public async assignRoles(userId: string, roleIdentifiers: string[]) {
+    await this.findById(userId) // ensure user exists
 
-    // Удаляем старые роли и добавляем новые
-    await this.db.$transaction(async (prisma) => {
-      await prisma.userRole.deleteMany({
-        where: { userId }
+    // Normalize input: may contain IDs (cuid) or names (Admin, admin)
+    const cleaned = (roleIdentifiers || [])
+      .map(r => (r || '').trim())
+      .filter(r => r.length > 0)
+
+    if (cleaned.length === 0) {
+      // If empty array provided, just remove all roles
+      await this.db.userRole.deleteMany({ where: { userId } })
+      return this.findById(userId)
+    }
+
+    // Split potential IDs vs names (simple heuristic: cuid starts with 'c' and length > 20)
+    const possibleIds = cleaned.filter(r => /^c[a-z0-9]{4,}/i.test(r))
+    const possibleNames = cleaned.filter(r => !/^c[a-z0-9]{4,}/i.test(r))
+
+    // Build case variants for names (original, Capitalized, upper)
+    const caseVariants = Array.from(new Set(
+      possibleNames.flatMap(n => {
+        const trimmed = n.trim()
+        const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase()
+        return [trimmed, capitalized, trimmed.toUpperCase()]
       })
+    ))
 
-      if (roleIds.length > 0) {
+    // Fetch roles by IDs OR by name variants
+    const roles = await this.db.role.findMany({
+      where: {
+        OR: [
+          possibleIds.length ? { id: { in: possibleIds } } : undefined,
+          caseVariants.length ? { name: { in: caseVariants } } : undefined
+        ].filter(Boolean) as any
+      }
+    })
+
+    // Map found role IDs
+    const resolvedRoleIds = roles.map(r => r.id)
+
+    // Validate that every identifier was resolved either as an ID or via name variant match
+    const lowerNameSet = new Set(roles.map(r => r.name.toLowerCase()))
+    const unresolved = cleaned.filter(identifier => {
+      if (resolvedRoleIds.includes(identifier)) return false
+      return !lowerNameSet.has(identifier.toLowerCase())
+    })
+
+    if (unresolved.length > 0) {
+      throw new BadRequestException(`One or more roles not found: ${unresolved.join(', ')}`)
+    }
+
+    const uniqueRoleIds = Array.from(new Set(resolvedRoleIds))
+
+    await this.db.$transaction(async prisma => {
+      await prisma.userRole.deleteMany({ where: { userId } })
+      if (uniqueRoleIds.length) {
         await prisma.userRole.createMany({
-          data: roleIds.map(roleId => ({
-            userId,
-            roleId
-          }))
+          data: uniqueRoleIds.map(roleId => ({ userId, roleId }))
         })
       }
     })
 
     return this.findById(userId)
   }
-
   // ========== Extended User Management Methods ==========
 
   // Rates and Schedule Management

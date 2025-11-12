@@ -1,5 +1,5 @@
--- CreateTable
-CREATE TABLE "session" (
+-- CreateTable (idempotent)
+CREATE TABLE IF NOT EXISTS "session" (
     "sid" VARCHAR(255) NOT NULL,
     "sess" JSONB NOT NULL,
     "expire" TIMESTAMP(3) NOT NULL,
@@ -7,5 +7,5 @@ CREATE TABLE "session" (
     CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
 );
 
--- CreateIndex
-CREATE INDEX "session_expire_idx" ON "session"("expire");
+-- CreateIndex (idempotent)
+CREATE INDEX IF NOT EXISTS "session_expire_idx" ON "session"("expire");

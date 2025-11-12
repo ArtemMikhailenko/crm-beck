@@ -124,8 +124,16 @@ export class UserController {
   @ApiOperation({ summary: 'Назначить роли пользователю' })
   @ApiResponse({ status: 200, description: 'Роли успешно назначены' })
   @ApiResponse({ status: 404, description: 'Пользователь не найден' })
-  public async assignRoles(@Param('id') id: string, @Body('roleIds') roleIds: string[]) {
-    return this.userService.assignRoles(id, roleIds)
+  public async assignRoles(
+    @Param('id') id: string,
+    @Body() body: { roleIds?: string[]; roleNames?: string[]; roles?: string[] }
+  ) {
+    // Accept flexible payloads:
+    // - { roleIds: ["cuid..."] }
+    // - { roleNames: ["Admin"] }
+    // - { roles: ["admin", "manager"] } // names or ids
+    const candidates = body?.roleIds ?? body?.roleNames ?? body?.roles ?? []
+    return this.userService.assignRoles(id, candidates)
   }
 
   @Get('profile/:id')
