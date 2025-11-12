@@ -6,7 +6,7 @@ import { CreateProjectDto, UpdateProjectDto, ProjectQueryDto } from './dto/proje
 @Injectable()
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
-
+// Create a new project
   async create(createProjectDto: CreateProjectDto) {
     // Resolve client: accept either existing company ID or a free-text name to auto-create CUSTOMER
     let clientId = createProjectDto.clientId
