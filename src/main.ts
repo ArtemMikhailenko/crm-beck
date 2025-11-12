@@ -23,6 +23,11 @@ async function bootstrap() {
 
   const config = app.get(ConfigService)
 
+  // Prevent crashes from unhandled errors
+  process.on('unhandledRejection', (err) => {
+    console.error('Unhandled rejection:', err)
+  })
+
   app.use(cookieParser(config.getOrThrow<string>('COOKIES_SECRET')))
 
   app.useGlobalPipes(
@@ -49,7 +54,7 @@ async function bootstrap() {
       store: new PgSession({
         conString: config.getOrThrow<string>('DATABASE_URL'),
         tableName: 'session',
-        createTableIfMissing: true,
+        errorLog: (...args) => console.error('Session store error:', ...args),
       })
     })
   )
@@ -96,7 +101,10 @@ async function bootstrap() {
   const port = config.get<number>('PORT') || config.get<number>('APPLICATION_PORT') || 8080
   await app.listen(port)
   
-  console.log(`🚀 Application is running on: http://localhost:${port}`)
-  console.log(`📚 Swagger docs available at: http://localhost:${port}/api/docs`)
+  console.log(`🚀 Application running on port ${port}`)
 }
-bootstrap()
+
+bootstrap().catch((err) => {
+  console.error('Bootstrap failed:', err)
+  process.exit(1)
+})
