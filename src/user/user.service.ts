@@ -319,21 +319,14 @@ export class UserService {
     const possibleIds = cleaned.filter(r => /^c[a-z0-9]{4,}/i.test(r))
     const possibleNames = cleaned.filter(r => !/^c[a-z0-9]{4,}/i.test(r))
 
-    // Build case variants for names (original, Capitalized, upper)
-    const caseVariants = Array.from(new Set(
-      possibleNames.flatMap(n => {
-        const trimmed = n.trim()
-        const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase()
-        return [trimmed, capitalized, trimmed.toUpperCase()]
-      })
-    ))
+    const normalize = (name: string) => (name || '').trim().toLowerCase()
 
-    // Fetch roles by IDs OR by name variants
+    // Fetch roles by IDs OR by case-insensitive name equals
     const roles = await this.db.role.findMany({
       where: {
         OR: [
           possibleIds.length ? { id: { in: possibleIds } } : undefined,
-          caseVariants.length ? { name: { in: caseVariants } } : undefined
+          ...possibleNames.map(n => ({ name: { equals: n, mode: 'insensitive' as const } }))
         ].filter(Boolean) as any
       }
     })
@@ -349,7 +342,12 @@ export class UserService {
     })
 
     if (unresolved.length > 0) {
-      throw new BadRequestException(`One or more roles not found: ${unresolved.join(', ')}`)
+      // provide available roles for clarity
+      const available = await this.db.role.findMany({ select: { id: true, name: true } })
+      const availableList = available.map(r => `${r.name} (${r.id})`).join(', ')
+      throw new BadRequestException(
+        `One or more roles not found: ${unresolved.join(', ')}. Available roles: ${availableList}`
+      )
     }
 
     const uniqueRoleIds = Array.from(new Set(resolvedRoleIds))
